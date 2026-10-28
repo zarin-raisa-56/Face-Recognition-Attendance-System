@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Face Recognition Attendance System</title>
+<meta name="description" content="ব্রাউজারেই চলা ফেস রিকগনিশন হাজিরা সিস্টেম: লাইভনেস চেক, রিপোর্ট ও CSV এক্সপোর্টসহ।">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f6f8; --surface:#ffffff; --ink:#18212b; --muted:#5d6b7a; --line:#dfe5ea;
+    --accent:#0f766e; --accent-ink:#ffffff; --accent-soft:#d9f0ec;
+    --ok:#15803d; --ok-soft:#dcfce7; --bad:#b91c1c; --bad-soft:#fee2e2; --warn:#b45309; --warn-soft:#fef3c7;
+    --radius:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e1419; --surface:#161e26; --ink:#e7edf2; --muted:#94a3b3; --line:#27333f;
+      --accent:#2dd4bf; --accent-ink:#06201d; --accent-soft:#12312e;
+      --ok:#4ade80; --ok-soft:#10301c; --bad:#f87171; --bad-soft:#3a1517; --warn:#fbbf24; --warn-soft:#352a0b;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hind Siliguri",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.5}
+  button,input{font:inherit;color:inherit}
+  [hidden]{display:none!important}
+
+  .btn{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:500}
+  .btn:hover{border-color:var(--accent)}
+  .btn:focus-visible,.tab:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .btn.danger{color:var(--bad)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  input[type=text],input[type=password],input[type=date]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+  label{display:block;font-size:14px;color:var(--muted);margin:10px 0 4px}
+
+  /* login */
+  #login{min-height:100vh;display:grid;place-items:center;padding:16px}
+  .login-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px}
+  .login-card h1{font-size:22px;margin:0 0 4px}
+  .login-card p{margin:0 0 12px;color:var(--muted);font-size:14px}
+  .err{color:var(--bad);font-size:14px;min-height:20px;margin-top:8px}
+
+  /* app shell */
+  header.bar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header.bar h1{font-size:18px;margin:0;margin-right:auto}
+  nav.tabs{display:flex;gap:4px;padding:10px 16px 0;overflow-x:auto}
+  .tab{background:transparent;border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;padding:9px 16px;cursor:pointer;white-space:nowrap;color:var(--muted);font-weight:500}
+  .tab[aria-selected=true]{background:var(--surface);border-color:var(--line);color:var(--accent);font-weight:600;position:relative}
+  main{padding:0 16px 24px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:0 var(--radius) var(--radius) var(--radius);padding:16px}
+
+  .cam-layout{display:grid;grid-template-columns:300px 1fr;gap:16px}
+  @media (max-width:820px){.cam-layout{grid-template-columns:1fr}}
+  .side{min-width:0}
+  .video-wrap{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3;max-width:640px;width:100%}
+  .video-wrap video,.video-wrap canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .video-wrap video{transform:scaleX(-1)}
+  .video-wrap .ph{position:absolute;inset:0;display:grid;place-items:center;color:#9aa7b4;font-size:14px;text-align:center;padding:16px}
+  .status{font-size:14px;color:var(--muted);margin-top:10px;min-height:22px}
+  .row{display:flex;gap:8px;margin-top:10px}
+  .row .btn{flex:1}
+  progress{width:100%;height:10px;margin-top:12px;accent-color:var(--accent)}
+  .check{display:flex;gap:8px;align-items:flex-start;margin:12px 0;font-size:14px;color:var(--ink)}
+  .check input{margin-top:5px}
+  .tips{font-size:13px;color:var(--muted);margin-top:14px;padding-left:18px}
+  .tips li{margin:2px 0}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{font-size:13px;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--surface)}
+  .tbl{overflow-x:auto;max-height:60vh;overflow-y:auto}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .toolbar label{margin:0}
+  .toolbar input[type=date]{width:auto}
+  .toolbar .grow{margin-left:auto;color:var(--muted);font-size:14px}
+  .badge{display:inline-block;padding:1px 10px;border-radius:99px;font-size:13px;font-weight:600}
+  .badge.ok{background:var(--ok-soft);color:var(--ok)}
+  .badge.bad{background:var(--bad-soft);color:var(--bad)}
+  .low td{color:var(--bad)}
+  .empty{color:var(--muted);text-align:center;padding:24px}
+  .mini-log{max-height:260px;overflow:auto;margin-top:6px;border:1px solid var(--line);border-radius:8px}
+  .mini-log table{font-size:13px}
+
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;font-size:15px;z-index:50;max-width:90vw}
+  dialog{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--ink);padding:22px;width:min(380px,92vw)}
+  dialog::backdrop{background:rgba(0,0,0,.45)}
+  dialog h2{margin:0 0 4px;font-size:18px}
+  .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  footer{text-align:center;color:var(--muted);font-size:13px;padding:0 16px 20px}
+</style>
+</head>
+<body>
+
+<!-- ================= লগইন ================= -->
+<section id="login">
+  <form class="login-card" id="loginForm" autocomplete="off">
+    <h1>অ্যাডমিন লগইন</h1>
+    <p>Face Recognition Attendance System</p>
+    <label for="lu">ইউজারনেম</label>
+    <input type="text" id="lu" value="admin" required>
+    <label for="lp">পাসওয়ার্ড</label>
+    <input type="password" id="lp" required>
+    <div class="err" id="loginErr" role="alert"></div>
+    <button class="btn primary" style="width:100%;margin-top:6px" type="submit">লগইন</button>
+  </form>
+</section>
+
+<!-- ================= মূল অ্যাপ ================= -->
+<div id="app" hidden>
+  <header class="bar">
+    <h1>Face Recognition Attendance System</h1>
+    <button class="btn" id="btnPw">পাসওয়ার্ড বদলাও</button>
+    <button class="btn" id="btnLogout">লগআউট</button>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="মেনু">
+    <button class="tab" role="tab" data-tab="attend"   aria-selected="true">হাজিরা নাও</button>
+    <button class="tab" role="tab" data-tab="register" aria-selected="false">স্টুডেন্ট রেজিস্ট্রেশন</button>
+    <button class="tab" role="tab" data-tab="daily"    aria-selected="false">দৈনিক রিপোর্ট</button>
+    <button class="tab" role="tab" data-tab="summary"  aria-selected="false">শতকরা সামারি</button>
+    <button class="tab" role="tab" data-tab="students" aria-selected="false">স্টুডেন্ট লিস্ট</button>
+  </nav>
+
+  <main>
+    <!-- হাজিরা -->
+    <section class="panel" id="tab-attend" role="tabpanel">
+      <div class="cam-layout">
+        <div class="side">
+          <div class="row" style="margin-top:0">
+            <button class="btn primary" id="aStart">হাজিরা শুরু</button>
+            <button class="btn" id="aStop">বন্ধ করো</button>
+          </div>
+          <label class="check"><input type="checkbox" id="aLive" checked>
+            <span>লাইভনেস চেক: পলক ফেললে তবেই হাজিরা হবে (ছবি দেখিয়ে ফাঁকি আটকায়)</span></label>
+          <label for="aTol">মুখ মেলানোর কড়াকড়ি: <b id="aTolVal">0.50</b> <span style="font-size:12px">(কম = কড়া)</span></label>
+          <input type="range" id="aTol" min="0.35" max="0.65" step="0.01" value="0.50">
+          <div class="status" id="aStatus" aria-live="polite">"হাজিরা শুরু" চাপো</div>
+          <div style="margin-top:12px;font-size:14px;color:var(--muted)">আজকের হাজিরা:</div>
+          <div class="mini-log"><table><thead><tr><th>আইডি</th><th>নাম</th><th>সময়</th></tr></thead><tbody id="aLog"></tbody></table></div>
+        </div>
+        <div>
+          <div class="video-wrap">
+            <video id="aVideo" playsinline muted></video>
+            <canvas id="aCanvas"></canvas>
+            <div class="ph" id="aPh">ক্যামেরা বন্ধ আছে</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- রেজিস্ট্রেশন -->
+    <section class="panel" id="tab-register" role="tabpanel" hidden>
+      <div class="cam-layout">
+        <div class="side">
+          <label for="rId" style="margin-top:0">স্টুডেন্ট আইডি</label>
+          <input type="text" id="rId" maxlength="40">
+          <label for="rName">নাম</label>
+          <input type="text" id="rName" maxlength="80">
+          <label for="rDept">ডিপার্টমেন্ট</label>
+          <input type="text" id="rDept" maxlength="60">
+          <div class="row">
+            <button class="btn primary" id="rStart">ক্যাপচার শুরু করো</button>
+            <button class="btn" id="rCancel">বাতিল</button>
+          </div>
+          <progress id="rProg" max="15" value="0"></progress>
+          <div class="status" id="rStatus" aria-live="polite">তথ্য দিয়ে ক্যাপচার শুরু করো</div>
+          <ul class="tips">
+            <li>সামনে ভালো আলো রাখো</li>
+            <li>ক্যামেরার দিকে তাকিয়ে মাথা সামান্য ডানে-বামে নাড়াও</li>
+            <li>ফ্রেমে শুধু একজন থাকবে</li>
+          </ul>
+        </div>
+        <div>
+          <div class="video-wrap">
+            <video id="rVideo" playsinline muted></video>
+            <canvas id="rCanvas"></canvas>
+            <div class="ph" id="rPh">ক্যামেরা বন্ধ আছে</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- দৈনিক রিপোর্ট -->
+    <section class="panel" id="tab-daily" role="tabpanel" hidden>
+      <div class="toolbar">
+        <label for="dDate">তারিখ</label>
+        <input type="date" id="dDate">
+        <button class="btn" id="dExport">CSV এক্সপোর্ট</button>
+        <span class="grow" id="dCount"></span>
+      </div>
+      <div class="tbl"><table>
+        <thead><tr><th>আইডি</th><th>নাম</th><th>ডিপার্টমেন্ট</th><th>স্ট্যাটাস</th><th>সময়</th></tr></thead>
+        <tbody id="dBody"></tbody></table></div>
+    </section>
+
+    <!-- সামারি -->
+    <section class="panel" id="tab-summary" role="tabpanel" hidden>
+      <div class="toolbar">
+        <label for="sFrom">থেকে</label><input type="date" id="sFrom">
+        <label for="sTo">পর্যন্ত</label><input type="date" id="sTo">
+        <button class="btn primary" id="sGo">হিসাব করো</button>
+        <button class="btn" id="sExport">CSV এক্সপোর্ট</button>
+        <span class="grow">৭৫%-এর নিচে লাল</span>
+      </div>
+      <div class="tbl"><table>
+        <thead><tr><th>আইডি</th><th>নাম</th><th>ডিপার্টমেন্ট</th><th>উপস্থিত দিন</th><th>মোট দিন</th><th>শতকরা (%)</th></tr></thead>
+        <tbody id="sBody"></tbody></table></div>
+    </section>
+
+    <!-- স্টুডেন্ট লিস্ট -->
+    <section class="panel" id="tab-students" role="tabpanel" hidden>
+      <div class="toolbar">
+        <button class="btn" id="bkExport">ব্যাকআপ ডাউনলোড (JSON)</button>
+        <button class="btn" id="bkImport">ব্যাকআপ রিস্টোর</button>
+        <input type="file" id="bkFile" accept="application/json,.json" hidden>
+        <span class="grow" id="stCount"></span>
+      </div>
+      <div class="tbl"><table>
+        <thead><tr><th>আইডি</th><th>নাম</th><th>ডিপার্টমেন্ট</th><th>ফেস স্যাম্পল</th><th>রেজিস্ট্রেশন</th><th></th></tr></thead>
+        <tbody id="stBody"></tbody></table></div>
+    </section>
+  </main>
+  <footer>সব ডেটা এই ব্রাউজারেই সেভ থাকে। ডিভাইস বা ব্রাউজার বদলালে "ব্যাকআপ" ব্যবহার করো।</footer>
+</div>
+
+<dialog id="pwDialog">
+  <form method="dialog" id="pwForm">
+    <h2>পাসওয়ার্ড বদলাও</h2>
+    <label for="pwOld">বর্তমান পাসওয়ার্ড</label><input type="password" id="pwOld">
+    <label for="pwNew">নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label><input type="password" id="pwNew">
+    <div class="err" id="pwErr" role="alert"></div>
+    <div class="actions">
+      <button class="btn" value="cancel" id="pwCancel" type="button">বাতিল</button>
+      <button class="btn primary" type="submit">সেভ</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" hidden role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
+<script>
+"use strict";
+
+/* ============================================================
+   সেটিং (Python সংস্করণের মানগুলোই রাখা হয়েছে)
+   ============================================================ */
+const CFG = {
+  SAMPLES_NEEDED: 15,        // রেজিস্ট্রেশনে কয়টা ছবি
+  CAPTURE_INTERVAL: 500,     // দুই ছবির বিরতি (ms)
+  TOLERANCE: 0.5,            // কম = কড়া
+  EAR_CLOSED: 0.21,          // এর নিচে = চোখ বন্ধ
+  EAR_OPEN: 0.25,            // এর উপরে = চোখ খোলা
+  LIVE_SECONDS: 15,          // পলকের পর কতক্ষণ বৈধ
+  LOW_PERCENT: 75,
+  MODEL_URL: "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/",
+};
+
+/* ============================================================
+   হেল্পার
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, "0");
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const nowTime = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text !== undefined) e.textContent = text;
+  if (cls) e.className = cls;
+  return e;
+}
+function row(cells, cls) {
+  const tr = document.createElement("tr");
+  if (cls) tr.className = cls;
+  cells.forEach((c) => { const td = document.createElement("td"); if (c instanceof Node) td.appendChild(c); else td.textContent = c; tr.appendChild(td); });
+  return tr;
+}
+function emptyRow(tbody, cols, msg) {
+  const tr = document.createElement("tr"), td = el("td", msg, "empty");
+  td.colSpan = cols; tr.appendChild(td); tbody.appendChild(tr);
+}
+let toastTimer;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2800);
+}
+
+/* ============================================================
+   স্টোরেজ (IndexedDB; না পেলে localStorage)
+   ============================================================ */
+const Store = {
+  data: null,
+  _db: null,
+  blank() { return { admin: null, students: [], attendance: [], nextPk: 1 }; },
+
+  async _open() {
+    if (this._db) return this._db;
+    this._db = await new Promise((res, rej) => {
+      const r = indexedDB.open("face-attendance", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("kv");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    return this._db;
+  },
+  async load() {
+    let d = null;
+    try {
+      const db = await this._open();
+      d = await new Promise((res, rej) => {
+        const q = db.transaction("kv").objectStore("kv").get("data");
+        q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+      });
+    } catch (e) {
+      try { d = JSON.parse(localStorage.getItem("face-attendance") || "null"); } catch (_) {}
+    }
+    this.data = d || this.blank();
+  },
+  async save() {
+    try {
+      const db = await this._open();
+      await new Promise((res, rej) => {
+        const tx = db.transaction("kv", "readwrite");
+        tx.objectStore("kv").put(this.data, "data");
+        tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+      });
+    } catch (e) {
+      try { localStorage.setItem("face-attendance", JSON.stringify(this.data)); }
+      catch (_) { toast("ডেটা সেভ করা যায়নি (স্টোরেজ ভরা বা ব্লক করা)।"); }
+    }
+  },
+};
+
+/* ---- পাসওয়ার্ড (PBKDF2-SHA256) ---- */
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+async function hashPw(password, salt) {
+  if (!window.crypto || !crypto.subtle) throw new Error("এই পেজ HTTPS বা localhost-এ খুলতে হবে।");
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 100000 }, key, 256);
+  return hex(bits);
+}
+const newSalt = () => hex(crypto.getRandomValues(new Uint8Array(16)));
+async function makeAdmin(username, password) {
+  const salt = newSalt();
+  return { username, salt, hash: await hashPw(password, salt) };
+}
+async function verifyAdmin(username, password) {
+  const a = Store.data.admin;
+  if (!a || a.username !== username) return false;
+  return (await hashPw(password, a.salt)) === a.hash;
+}
+
+/* ---- ডাটা অপারেশন ---- */
+const DB = {
+  students: () => [...Store.data.students].sort((a, b) => a.student_id.localeCompare(b.student_id, undefined, { numeric: true })),
+  addStudent(student_id, name, department, encodings) {
+    if (!encodings.length) throw new Error("কোনো ফেস এনকোডিং পাওয়া যায়নি।");
+    if (Store.data.students.some((s) => s.student_id === student_id))
+      throw new Error(`স্টুডেন্ট আইডি '${student_id}' আগে থেকেই আছে।`);
+    Store.data.students.push({
+      pk: Store.data.nextPk++, student_id, name, department,
+      created_at: new Date().toISOString().slice(0, 19).replace("T", " "),
+      encodings: encodings.map((e) => Array.from(e)),
+    });
+    return Store.save();
+  },
+  deleteStudent(pk) {
+    Store.data.students = Store.data.students.filter((s) => s.pk !== pk);
+    Store.data.attendance = Store.data.attendance.filter((a) => a.pk !== pk);
+    return Store.save();
+  },
+  markAttendance(pk) {
+    const date = todayStr();
+    if (Store.data.attendance.some((a) => a.pk === pk && a.date === date)) return false;
+    Store.data.attendance.push({ pk, date, time: nowTime() });
+    Store.save();
+    return true;
+  },
+  knownFaces() {
+    const owners = [], descs = [];
+    for (const s of Store.data.students)
+      for (const e of s.encodings) { owners.push(s); descs.push(Float32Array.from(e)); }
+    return { owners, descs };
+  },
+  daily(day) {
+    return this.students().map((s) => {
+      const a = Store.data.attendance.find((x) => x.pk === s.pk && x.date === day);
+      return { student_id: s.student_id, name: s.name, department: s.department,
+               status: a ? "Present" : "Absent", time: a ? a.time : "" };
+    });
+  },
+  summary(from, to) {
+    const inRange = Store.data.attendance.filter((a) => a.date >= from && a.date <= to);
+    const total = new Set(inRange.map((a) => a.date)).size;
+    return this.students().map((s) => {
+      const present = inRange.filter((a) => a.pk === s.pk).length;
+      const pct = total ? Math.round((present / total) * 1000) / 10 : 0;
+      return [s.student_id, s.name, s.department, present, total, pct];
+    });
+  },
+};
+
+/* ============================================================
+   ফেস ইঞ্জিন (face-api.js)
+   ============================================================ */
+const Engine = {
+  ready: false,
+  _p: null,
+  load(onStatus) {
+    if (this.ready) return Promise.resolve();
+    if (typeof faceapi === "undefined")
+      return Promise.reject(new Error("face-api.js লোড হয়নি। ইন্টারনেট সংযোগ দেখো।"));
+    if (!this._p) {
+      onStatus && onStatus("মডেল লোড হচ্ছে (প্রথমবার একটু সময় লাগবে)...");
+      this._p = Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(CFG.MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(CFG.MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(CFG.MODEL_URL),
+      ]).then(() => { this.ready = true; }).catch((e) => { this._p = null; throw e; });
+    }
+    return this._p;
+  },
+  detect(video) {
+    return faceapi
+      .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+  },
+  bestMatch(descs, descriptor, tolerance) {
+    let idx = -1, best = Infinity;
+    for (let i = 0; i < descs.length; i++) {
+      const d = faceapi.euclideanDistance(descs[i], descriptor);
+      if (d < best) { best = d; idx = i; }
+    }
+    return idx >= 0 && best <= tolerance ? { idx, dist: best } : { idx: null, dist: best };
+  },
+};
+
+/* EAR: চোখ বন্ধ হলে মান কমে যায় */
+const pdist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function eyeAR(p) {
+  const c = pdist(p[0], p[3]);
+  return c ? (pdist(p[1], p[5]) + pdist(p[2], p[4])) / (2 * c) : 0;
+}
+function averageEAR(landmarks) {
+  const pts = landmarks.positions; // 68 বিন্দু: বাঁ চোখ 36–41, ডান চোখ 42–47
+  return (eyeAR(pts.slice(36, 42)) + eyeAR(pts.slice(42, 48))) / 2;
+}
+class BlinkTracker {
+  constructor() { this.closed = new Map(); this.verified = new Map(); }
+  update(key, ear) {
+    if (ear < CFG.EAR_CLOSED) this.closed.set(key, true);
+    else if (ear > CFG.EAR_OPEN && this.closed.get(key)) {
+      this.closed.set(key, false);              // বন্ধ হয়ে আবার খুলল = একটি পলক
+      this.verified.set(key, performance.now());
+    }
+  }
+  isLive(key) {
+    const t = this.verified.get(key);
+    return t !== undefined && performance.now() - t <= CFG.LIVE_SECONDS * 1000;
+  }
+  reset() { this.closed.clear(); this.verified.clear(); }
+}
+
+/* ============================================================
+   ক্যামেরা সেশন (ভিডিও + ওভারলে ক্যানভাস + ডিটেকশন লুপ)
+   ============================================================ */
+class CameraSession {
+  constructor({ video, canvas, placeholder, onFrame }) {
+    Object.assign(this, { video, canvas, placeholder, onFrame });
+    this.stream = null; this.active = false; this.token = 0;
+  }
+  async start(setStatus) {
+    if (this.active) return true;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus("এই ব্রাউজারে ক্যামেরা সাপোর্ট নেই (HTTPS লাগবে)।"); return false;
+    }
+    try {
+      await Engine.load(setStatus);
+    } catch (e) { setStatus("মডেল লোড করা যায়নি: " + e.message); return false; }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false });
+    } catch (e) {
+      setStatus("ক্যামেরা চালু করা যায়নি। পারমিশন দাও এবং অন্য অ্যাপ (Zoom/Meet) বন্ধ করো।"); return false;
+    }
+    this.video.srcObject = this.stream;
+    await this.video.play().catch(() => {});
+    this.placeholder.hidden = true;
+    this.active = true;
+    const my = ++this.token;
+    this._loop(my);
+    return true;
+  }
+  stop() {
+    this.active = false; this.token++;
+    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    this.stream = null; this.video.srcObject = null;
+    const ctx = this.canvas.getContext("2d"); ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.placeholder.hidden = false;
+  }
+  async _loop(my) {
+    while (this.active && my === this.token) {
+      const v = this.video;
+      if (v.readyState >= 2 && v.videoWidth) {
+        if (this.canvas.width !== v.videoWidth) { this.canvas.width = v.videoWidth; this.canvas.height = v.videoHeight; }
+        try {
+          const dets = await Engine.detect(v);
+          if (!this.active || my !== this.token) break;
+          this.onFrame(dets, this.canvas.getContext("2d"), v.videoWidth);
+        } catch (e) { console.error(e); }
+      }
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+  }
+}
+
+/* বক্স আঁকা: ভিডিও CSS দিয়ে আয়না করা, তাই x উল্টে আঁকা হয় (লেখা সোজা থাকে) */
+function drawBox(ctx, W, box, label, color) {
+  const x = W - (box.x + box.width), y = box.y, w = box.width, h = box.height;
+  ctx.lineWidth = 3; ctx.strokeStyle = color; ctx.strokeRect(x, y, w, h);
+  if (label) {
+    ctx.font = "600 16px 'Hind Siliguri', system-ui, sans-serif";
+    const tw = ctx.measureText(label).width + 12, ty = Math.max(0, y - 24);
+    ctx.fillStyle = color; ctx.fillRect(x, ty, tw, 24);
+    ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(label, x + 6, ty + 12);
+  }
+}
+
+/* ============================================================
+   CSV
+   ============================================================ */
+function csvCell(v) {
+  let s = String(v ?? "");
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;       // এক্সেল ফর্মুলা ইনজেকশন ঠেকাতে
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function downloadFile(name, content, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement("a"); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function exportCSV(name, header, rows) {
+  const lines = [header, ...rows].map((r) => r.map(csvCell).join(","));
+  downloadFile(name, "﻿" + lines.join("\r\n"), "text/csv;charset=utf-8");   // BOM: এক্সেলে বাংলা ঠিক দেখায়
+  toast("CSV ফাইল ডাউনলোড হয়েছে।");
+}
+
+/* ============================================================
+   ট্যাব: হাজিরা
+   ============================================================ */
+const Attend = (() => {
+  const blink = new BlinkTracker();
+  let known = { owners: [], descs: [] };
+  const setStatus = (t) => ($("aStatus").textContent = t);
+
+  const cam = new CameraSession({
+    video: $("aVideo"), canvas: $("aCanvas"), placeholder: $("aPh"),
+    onFrame(dets, ctx, W) {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      const tol = parseFloat($("aTol").value), liveness = $("aLive").checked;
+      let msg = dets.length ? "" : "মুখ দেখা যাচ্ছে না...";
+      for (const d of dets) {
+        const { idx } = Engine.bestMatch(known.descs, d.descriptor, tol);
+        if (idx === null) { drawBox(ctx, W, d.detection.box, "Unknown", "#dc2626"); continue; }
+        const s = known.owners[idx];
+        if (liveness) {
+          blink.update(s.student_id, averageEAR(d.landmarks));
+          if (!blink.isLive(s.student_id)) {
+            drawBox(ctx, W, d.detection.box, `${s.student_id}: পলক ফেলো`, "#d97706");
+            msg = "পরিচয় পাওয়া গেছে, এবার একবার পলক ফেলো।";
+            continue;
+          }
+        }
+        if (DB.markAttendance(s.pk)) {
+          addLog(s.student_id, s.name, nowTime(), true);
+          toast(`${s.name} (${s.student_id}) এর হাজিরা হয়েছে`);
+        }
+        drawBox(ctx, W, d.detection.box, `${s.student_id} ${s.name}`, "#15803d");
+        msg = `${s.name}: হাজিরা হয়েছে ✓`;
+      }
+      if (msg) setStatus(msg);
+    },
+  });
+
+  function addLog(id, name, time, top) {
+    const tr = row([id, name, time]);
+    const body = $("aLog");
+    if (top) body.prepend(tr); else body.appendChild(tr);
+  }
+  function loadTodayLog() {
+    $("aLog").replaceChildren();
+    const day = todayStr();
+    Store.data.attendance.filter((a) => a.date === day).sort((a, b) => b.time.localeCompare(a.time)).forEach((a) => {
+      const s = Store.data.students.find((x) => x.pk === a.pk);
+      if (s) addLog(s.student_id, s.name, a.time, false);
+    });
+  }
+
+  $("aTol").addEventListener("input", () => ($("aTolVal").textContent = parseFloat($("aTol").value).toFixed(2)));
+  $("aLive").addEventListener("change", () => blink.reset());
+  $("aStart").addEventListener("click", async () => {
+    known = DB.knownFaces();
+    if (!known.owners.length) { toast("আগে অন্তত একজন স্টুডেন্ট রেজিস্টার করো।"); return; }
+    blink.reset(); loadTodayLog();
+    setStatus("ক্যামেরা চালু হচ্ছে...");
+    if (await cam.start(setStatus)) setStatus("ক্যামেরার সামনে এসো। রেজিস্টার্ড কেউ পলক ফেললেই হাজিরা হবে।");
+  });
+  $("aStop").addEventListener("click", () => { cam.stop(); setStatus("বন্ধ করা হয়েছে"); });
+
+  return { stop: () => cam.stop() };
+})();
+
+/* ============================================================
+   ট্যাব: রেজিস্ট্রেশন
+   ============================================================ */
+const Register = (() => {
+  let capturing = false, samples = [], last = 0, busy = false;
+  const setStatus = (t) => ($("rStatus").textContent = t);
+  $("rProg").max = CFG.SAMPLES_NEEDED;
+
+  const cam = new CameraSession({
+    video: $("rVideo"), canvas: $("rCanvas"), placeholder: $("rPh"),
+    onFrame(dets, ctx, W) {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      const color = dets.length === 1 ? "#15803d" : "#dc2626";
+      dets.forEach((d) => drawBox(ctx, W, d.detection.box, "", color));
+      if (!capturing) return;
+      if (dets.length > 1) { setStatus("ফ্রেমে একাধিক মুখ আছে। শুধু একজন থাকো।"); return; }
+      if (dets.length === 0) { setStatus("মুখ দেখা যাচ্ছে না।"); return; }
+      if (performance.now() - last < CFG.CAPTURE_INTERVAL) return;
+      samples.push(dets[0].descriptor); last = performance.now();
+      $("rProg").value = samples.length;
+      setStatus(`${samples.length}/${CFG.SAMPLES_NEEDED} ছবি নেওয়া হয়েছে`);
+      if (samples.length >= CFG.SAMPLES_NEEDED) finish();
+    },
+  });
+
+  async function finish() {
+    if (busy) return; busy = true; capturing = false;
+    const id = $("rId").value.trim(), name = $("rName").value.trim(), dept = $("rDept").value.trim();
+    try {
+      await DB.addStudent(id, name, dept, samples);
+      toast(`${name} সফলভাবে রেজিস্টার হয়েছে।`);
+      ["rId", "rName", "rDept"].forEach((k) => ($(k).value = ""));
+      Students.refresh();
+      setStatus("নতুন স্টুডেন্ট যোগ করা যাবে");
+    } catch (e) { toast(e.message); setStatus(e.message); }
+    samples = []; $("rProg").value = 0; $("rStart").disabled = false; busy = false;
+    cam.stop();
+  }
+  function cancel(silent) {
+    capturing = false; samples = []; $("rProg").value = 0; $("rStart").disabled = false; cam.stop();
+    if (!silent) setStatus("বাতিল করা হয়েছে");
+  }
+
+  $("rStart").addEventListener("click", async () => {
+    const id = $("rId").value.trim(), name = $("rName").value.trim();
+    if (!id || !name) { toast("স্টুডেন্ট আইডি ও নাম দিতেই হবে।"); return; }
+    if (Store.data.students.some((s) => s.student_id === id)) { toast(`আইডি '${id}' আগে থেকেই রেজিস্টার্ড।`); return; }
+    $("rStart").disabled = true; setStatus("ক্যামেরা চালু হচ্ছে...");
+    if (!(await cam.start(setStatus))) { $("rStart").disabled = false; return; }
+    samples = []; $("rProg").value = 0; last = 0; capturing = true;
+    setStatus("ক্যামেরার দিকে তাকাও...");
+  });
+  $("rCancel").addEventListener("click", () => cancel(false));
+
+  return { stop: () => cancel(true) };
+})();
+
+/* ============================================================
+   ট্যাব: দৈনিক রিপোর্ট, সামারি, স্টুডেন্ট লিস্ট
+   ============================================================ */
+const Daily = {
+  rows: [],
+  refresh() {
+    const day = $("dDate").value || todayStr();
+    this.rows = DB.daily(day);
+    const body = $("dBody"); body.replaceChildren();
+    let present = 0;
+    this.rows.forEach((r) => {
+      const ok = r.status === "Present"; if (ok) present++;
+      body.appendChild(row([r.student_id, r.name, r.department, el("span", r.status, "badge " + (ok ? "ok" : "bad")), r.time]));
+    });
+    if (!this.rows.length) emptyRow(body, 5, "কোনো স্টুডেন্ট নেই");
+    $("dCount").textContent = `উপস্থিত: ${present} / ${this.rows.length}`;
+  },
+  export() {
+    const day = $("dDate").value || todayStr();
+    exportCSV(`attendance_${day}.csv`, ["আইডি", "নাম", "ডিপার্টমেন্ট", "স্ট্যাটাস", "সময়"],
+      this.rows.map((r) => [r.student_id, r.name, r.department, r.status, r.time]));
+  },
+};
+const Summary = {
+  rows: [],
+  refresh() {
+    const from = $("sFrom").value, to = $("sTo").value;
+    if (!from || !to || from > to) { toast("সঠিক তারিখের রেঞ্জ দাও।"); return; }
+    this.rows = DB.summary(from, to);
+    const body = $("sBody"); body.replaceChildren();
+    this.rows.forEach((r) => body.appendChild(row(r, r[5] < CFG.LOW_PERCENT ? "low" : "")));
+    if (!this.rows.length) emptyRow(body, 6, "কোনো স্টুডেন্ট নেই");
+  },
+  export() {
+    if (!this.rows.length) this.refresh();
+    exportCSV("attendance_summary.csv", ["আইডি", "নাম", "ডিপার্টমেন্ট", "উপস্থিত দিন", "মোট দিন", "শতকরা (%)"], this.rows);
+  },
+};
+const Students = {
+  refresh() {
+    const body = $("stBody"); body.replaceChildren();
+    const list = DB.students();
+    list.forEach((s) => {
+      const del = el("button", "ডিলিট", "btn danger"); del.style.padding = "3px 10px";
+      del.addEventListener("click", async () => {
+        if (confirm(`${s.name} (${s.student_id}) এবং তার সব হাজিরা মুছে যাবে। চালিয়ে যাবে?`)) {
+          await DB.deleteStudent(s.pk); this.refresh(); toast("ডিলিট হয়েছে।");
+        }
+      });
+      body.appendChild(row([s.student_id, s.name, s.department, String(s.encodings.length), s.created_at, del]));
+    });
+    if (!list.length) emptyRow(body, 6, "এখনো কেউ রেজিস্টার হয়নি");
+    $("stCount").textContent = `মোট স্টুডেন্ট: ${list.length}`;
+  },
+  exportBackup() {
+    const { students, attendance, nextPk } = Store.data;     // অ্যাডমিনের পাসওয়ার্ড ব্যাকআপে যায় না
+    downloadFile(`attendance_backup_${todayStr()}.json`, JSON.stringify({ version: 1, students, attendance, nextPk }), "application/json");
+    toast("ব্যাকআপ ডাউনলোড হয়েছে। এতে ফেস ডেটা আছে, নিরাপদে রাখো।");
+  },
+  async importBackup(file) {
+    try {
+      const d = JSON.parse(await file.text());
+      if (!Array.isArray(d.students) || !Array.isArray(d.attendance)) throw new Error();
+      if (!confirm(`রিস্টোর করলে বর্তমান সব ডেটা মুছে ${d.students.length} জন স্টুডেন্টের ব্যাকআপ বসবে। চালিয়ে যাবে?`)) return;
+      Store.data.students = d.students; Store.data.attendance = d.attendance;
+      Store.data.nextPk = d.nextPk || Math.max(0, ...d.students.map((s) => s.pk)) + 1;
+      await Store.save(); this.refresh(); toast("ব্যাকআপ রিস্টোর হয়েছে।");
+    } catch (_) { toast("ফাইলটি সঠিক ব্যাকআপ নয়।"); }
+  },
+};
+
+/* ============================================================
+   ট্যাব সুইচ
+   ============================================================ */
+const TABS = ["attend", "register", "daily", "summary", "students"];
+function showTab(name) {
+  Attend.stop(); Register.stop();                       // ট্যাব বদলালে ক্যামেরা বন্ধ
+  TABS.forEach((t) => { $("tab-" + t).hidden = t !== name; });
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  if (name === "daily") Daily.refresh();
+  if (name === "students") Students.refresh();
+}
+document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+$("dDate").addEventListener("change", () => Daily.refresh());
+$("dExport").addEventListener("click", () => Daily.export());
+$("sGo").addEventListener("click", () => Summary.refresh());
+$("sExport").addEventListener("click", () => Summary.export());
+$("bkExport").addEventListener("click", () => Students.exportBackup());
+$("bkImport").addEventListener("click", () => $("bkFile").click());
+$("bkFile").addEventListener("change", (e) => { if (e.target.files[0]) Students.importBackup(e.target.files[0]); e.target.value = ""; });
+
+/* ============================================================
+   লগইন / লগআউট / পাসওয়ার্ড
+   ============================================================ */
+function showApp() {
+  $("login").hidden = true; $("app").hidden = false;
+  const t = todayStr(), first = t.slice(0, 8) + "01";
+  $("dDate").value = t; $("sFrom").value = first; $("sTo").value = t;
+  showTab("attend");
+}
+$("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("loginErr").textContent = "";
+  try {
+    if (await verifyAdmin($("lu").value.trim(), $("lp").value)) { $("lp").value = ""; showApp(); }
+    else $("loginErr").textContent = "ইউজারনেম বা পাসওয়ার্ড ভুল।";
+  } catch (err) { $("loginErr").textContent = err.message; }
+});
+$("btnLogout").addEventListener("click", () => {
+  Attend.stop(); Register.stop(); $("app").hidden = true; $("login").hidden = false; $("lp").focus();
+});
+$("btnPw").addEventListener("click", () => { $("pwErr").textContent = ""; $("pwOld").value = $("pwNew").value = ""; $("pwDialog").showModal(); });
+$("pwCancel").addEventListener("click", () => $("pwDialog").close());
+$("pwForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    if (!(await verifyAdmin(Store.data.admin.username, $("pwOld").value))) { $("pwErr").textContent = "বর্তমান পাসওয়ার্ড ভুল।"; return; }
+    if ($("pwNew").value.length < 6) { $("pwErr").textContent = "নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।"; return; }
+    Store.data.admin = await makeAdmin(Store.data.admin.username, $("pwNew").value);
+    await Store.save(); $("pwDialog").close(); toast("পাসওয়ার্ড বদলানো হয়েছে।");
+  } catch (err) { $("pwErr").textContent = err.message; }
+});
+
+/* ============================================================
+   চালু
+   ============================================================ */
+(async function init() {
+  await Store.load();
+  if (!Store.data.admin) {                       // প্রথমবার: ডিফল্ট admin / admin123
+    try { Store.data.admin = await makeAdmin("admin", "admin123"); await Store.save(); }
+    catch (e) { $("loginErr").textContent = e.message; }
+  }
+  window.addEventListener("pagehide", () => { Attend.stop(); Register.stop(); });
+})();
+</script>
+</body>
+</html>
